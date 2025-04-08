@@ -1,0 +1,18 @@
+# Base da imagem
+FROM python:3.11-slim
+
+# Define diretório de trabalho no container
+WORKDIR /app
+
+# Copia tudo para dentro do container
+COPY . .
+
+# Instala as dependências
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Expõe a porta que o app vai rodar
+EXPOSE 8000
+
+# Comando para iniciar o servidor com Gunicorn + Uvicorn Worker
+CMD ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]

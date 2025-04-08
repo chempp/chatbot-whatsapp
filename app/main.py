@@ -1,68 +1,51 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 from typing import Dict
-import uvicorn
-import json
+import datetime
 
 app = FastAPI()
 
-templates = Jinja2Templates(directory="templates")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-# Simulação de usuários conectados
-users: Dict[str, Dict] = {
-    "11999999999": {
-        "name": "João",
-        "step": 3,
-        "messages": ["Oi, tudo bem?", "Preciso de ajuda com o pedido"]
-    },
-    "11888888888": {
-        "name": "Maria",
-        "step": 2,
-        "messages": ["Olá!", "Qual é o prazo de entrega?"]
-    }
-}
+connected_users: Dict[str, WebSocket] = {}
 
-# Conexões WebSocket ativas
-active_connections: Dict[str, WebSocket] = {}
-
-# Página principal do dashboard
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "users": users
-    })
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
-# Página de chat para um número específico
-@app.get("/chat/{phone}", response_class=HTMLResponse)
-async def open_chat(request: Request, phone: str):
-    if phone not in users:
-        return HTMLResponse("Usuário não encontrado", status_code=404)
-    return templates.TemplateResponse("chat.html", {
-        "request": request,
-        "phone": phone,
-        "name": users[phone]["name"],
-        "messages": users[phone]["messages"]
-    })
+@app.get("/chat", response_class=HTMLResponse)
+async def chat(request: Request, username: str):
+    return templates.TemplateResponse("chat.html", {"request": request, "username": username})
 
-# WebSocket para conversa em tempo real
-@app.websocket("/ws/{phone}")
-async def websocket_endpoint(websocket: WebSocket, phone: str):
+@app.websocket("/ws/{username}")
+async def websocket_endpoint(websocket: WebSocket, username: str):
     await websocket.accept()
-    active_connections[phone] = websocket
+    connected_users[username] = websocket
+    await notify_users()
     try:
         while True:
             data = await websocket.receive_text()
-            users[phone]["messages"].append(f"Atendente: {data}")
-            await websocket.send_text(json.dumps({
-                "from": "atendente",
-                "message": data
-            }))
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            for user, conn in connected_users.items():
+                await conn.send_text(f"[{timestamp}] {username}: {data}")
     except WebSocketDisconnect:
-        del active_connections[phone]
+        del connected_users[username]
+        await notify_users()
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+async def notify_users():
+    user_list = ", ".join(connected_users.keys())
+    for conn in connected_users.values():
+        await conn.send_text(f"Usuários online: {user_list}")
