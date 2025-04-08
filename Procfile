@@ -1,2 +1,2 @@
-web: gunicorn app:app
-web: uvicorn app.main:app --host=0.0.0.0 --port=${PORT:-8000}
+web: gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000}
+
