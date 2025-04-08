@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Atendimentos - WhatsApp Bot</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .user { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 10px; }
+    .user h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h1>Usuários em atendimento</h1>
+  {% for phone, data in users.items() %}
+    <div class="user">
+      <h3>{{ data.name if data.step >= 2 else 'Sem nome ainda' }}</h3>
+      <p><strong>Telefone:</strong> {{ phone }}</p>
+      <p><strong>Passo:</strong> {{ data.step }}</p>
+    </div>
+  {% endfor %}
+</body>
+</html>
